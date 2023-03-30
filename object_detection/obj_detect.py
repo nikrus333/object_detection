@@ -31,30 +31,34 @@ class FaceRecognition(Node):
         self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
 
         self.depth_image = None  
+
+        self.count = 0
         
     def listener_callback(self, data):
-        current_frame = self.br.imgmsg_to_cv2(data)
-        results = self.model(current_frame)
-        # Results
-        #results.print()  # or .show(), .save(), .crop(), .pandas(), etc.
-        #self.get_logger().info('Publishing: "%s"' % self.msg)
-        #print('\n', results.xyxy[0])
-        #print(results.pandas().xyxy[0])
-        arr_name = []
-        arr_coordinates = []
-        name = results.pandas().xyxy[0]['name']
-        #print(len(name))
-        for count in range(len(name)):
-            name_obj = results.pandas().xyxy[0]['name'][count]
-            x_center = int(results.pandas().xyxy[0]['xmax'][count] - results.pandas().xyxy[0]['xmin'][count])
-            y_center = int(results.pandas().xyxy[0]['ymax'][count] - results.pandas().xyxy[0]['ymin'][count])
-            x, y, z = self.depth_solution([x_center, y_center])
-            arr_name.append(name_obj)
-            arr_coordinates.append([x, y , z])
-            #print(x, y, z)
-        graf_one = self.graf.Graf(arr_name, arr_coordinates)
-        print(graf_one.get_graf())
-        #print(self.graf.list_graf)
+        self.count += 1 
+        if self.count % 5 == 1:
+            current_frame = self.br.imgmsg_to_cv2(data)
+            results = self.model(current_frame)
+            # Results
+            #results.print()  # or .show(), .save(), .crop(), .pandas(), etc.
+            #self.get_logger().info('Publishing: "%s"' % self.msg)
+            #print('\n', results.xyxy[0])
+            #print(results.pandas().xyxy[0])
+            arr_name = []
+            arr_coordinates = []
+            name = results.pandas().xyxy[0]['name']
+            #print(len(name))
+            for count in range(len(name)):
+                name_obj = results.pandas().xyxy[0]['name'][count]
+                x_center = int(results.pandas().xyxy[0]['xmax'][count] - results.pandas().xyxy[0]['xmin'][count])
+                y_center = int(results.pandas().xyxy[0]['ymax'][count] - results.pandas().xyxy[0]['ymin'][count])
+                x, y, z = self.depth_solution([x_center, y_center])
+                arr_name.append(name_obj)
+                arr_coordinates.append([x, y, z])
+                #print(x, y, z)
+            graf_one = self.graf.Graf(arr_name, arr_coordinates)
+            print(graf_one.get_graf())
+            #print(self.graf.list_graf)
 
         #print(len(self.graf.list_graf))
     def depth_callback(self, data):
