@@ -14,29 +14,42 @@ from cv_bridge import CvBridge
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 class FaceRecognition(Node):
     def __init__(self):
         self.graf = GrafWork()
         self.br = CvBridge()
-        self.k = 0.52
         self.strat = time.time()
         super().__init__('minimal_subscriber')
         self.sub_image = self.create_subscription( Image, '/camera/rgb/image_color', self.listener_callback, qos_profile_sensor_data) 
         self.sub__depth_image = self.create_subscription( Image, '/camera/depth/image', self.depth_callback, qos_profile_sensor_data) 
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
         #self.publisher_image = self.create_publisher(Image, '/face_frames', 10)  
         self.start = time.time()
         self.base_frame = None
-        self.k = 0.55
+    
         self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
-
+        
+        self.k = 0.52
         self.depth_image = None  
-
         self.count = 0
         
     def listener_callback(self, data):
         self.count += 1 
         if self.count % 5 == 1:
+            try:
+                t = self.tf_buffer.lookup_transform('world_1', 'camera', rclpy.time.Time(),   timeout=rclpy.duration.Duration(seconds=1.0))
+                coordinate_camera = (t.transform.translation.x, t.transform.translation.y, t.transform.translation.z)
+            except:
+                coordinate_camera = (0,0,0)
+            print(coordinate_camera)
+
             current_frame = self.br.imgmsg_to_cv2(data)
             results = self.model(current_frame)
             # Results
@@ -45,7 +58,7 @@ class FaceRecognition(Node):
             #print('\n', results.xyxy[0])
             #print(results.pandas().xyxy[0])
             arr_name = []
-            arr_coordinates = []
+            arr_coordinates_object = []
             name = results.pandas().xyxy[0]['name']
             #print(len(name))
             for count in range(len(name)):
@@ -54,10 +67,13 @@ class FaceRecognition(Node):
                 y_center = int(results.pandas().xyxy[0]['ymax'][count] - results.pandas().xyxy[0]['ymin'][count])
                 x, y, z = self.depth_solution([x_center, y_center])
                 arr_name.append(name_obj)
-                arr_coordinates.append([x, y, z])
+                arr_coordinates_object.append([x, y, z])
                 #print(x, y, z)
-            graf_one = self.graf.Graf(arr_name, arr_coordinates)
-            print(graf_one.get_graf())
+                
+            graf_one = self.graf.Graf(arr_name, arr_coordinates_object, coordinate_camera)
+            if graf_one.valid == True:
+                pass
+                #print(graf_one.get_graf())
             #print(self.graf.list_graf)
 
         #print(len(self.graf.list_graf))
@@ -80,6 +96,8 @@ class FaceRecognition(Node):
         except:
             x, y, z = (0,0,0)
         return (x, y, z)
+    
+    
         
 
 class GrafWork():
@@ -111,9 +129,17 @@ class GrafWork():
             count += 1
                         
     class Graf():
-        def __init__(self, arr_name, arr_coordinates) -> None:
+        # def __new__(cls, item):
+        #     if cls.IsValid(item):
+        #         return super(SampleObject, cls).__new__(cls)
+        #     else:
+        #         return None
+            
+        def __init__(self, arr_name, arr_coordinates, coordinate_camera) -> None:
             self.vertices = arr_name
+            self.valid = True
             self.edge = self.create_edges(arr_name, arr_coordinates)
+            self.coordinates = coordinate_camera
             print('init')
 
         def create_edges(self, arr_name, arr_coordinates):
@@ -124,6 +150,8 @@ class GrafWork():
             for i in range(len(arr_name)):
                 for temp in range(len(arr_name)):
                     distanse = math.sqrt((arr_coordinates[i][0]-arr_coordinates[temp][0])**2 + (arr_coordinates[i][1]-arr_coordinates[temp][1])**2 + (arr_coordinates[i][2]-arr_coordinates[temp][2])**2)
+                    if math.isnan(distanse):
+                        self.valid = False
                     edge_dict[arr_name[temp]] = distanse
 
                 edge_arr.append({arr_name_copy[i] : edge_dict})
