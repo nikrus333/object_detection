@@ -70,9 +70,10 @@ class FaceRecognition(Node):
                 arr_coordinates_object.append([x, y, z])
                 #print(x, y, z)
                 
-            graf_one = self.graf.Graf(arr_name, arr_coordinates_object, coordinate_camera)
-            if graf_one.valid == True:
-                pass
+            #graf_one = self.graf.Graf(arr_name, arr_coordinates_object, coordinate_camera)
+
+            #if graf_one.valid == True:
+               # pass
                 #print(graf_one.get_graf())
             #print(self.graf.list_graf)
 
